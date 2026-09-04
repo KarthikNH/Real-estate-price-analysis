@@ -98,11 +98,176 @@ function renderData(){
  `<div class="filters"><input id="search" placeholder="Search location…"><select id="rowsN"><option>25</option><option>50</option><option>100</option></select></div><div class="card table-wrap"><table class="table"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody id="tbody"></tbody></table></div>${footer()}`;
  const update=()=>{let q=document.querySelector("#search").value.toLowerCase(),n=+document.querySelector("#rowsN").value,a=rows.filter(r=>String(r.location).toLowerCase().includes(q)).slice(0,n);document.querySelector("#tbody").innerHTML=a.map(r=>`<tr>${cols.map(c=>`<td>${r[c]??""}</td>`).join("")}</tr>`).join("")};document.querySelector("#search").oninput=update;document.querySelector("#rowsN").onchange=update;update();
 }
-function renderMap(){
- const q=locs.map(x=>`<li><b>${x.location}</b> — ${x.cat}, score ${x.score.toFixed(1)}, ${money(x.pps)}/sqft</li>`).join("");
- document.querySelector("#main").innerHTML=head("Geospatial Intelligence Map","Location coordinates from the dataset, with investment intelligence")+
- `<div class="card"><div class="map"><div class="map-note">Map markers are linked to the dataset locations below.</div><iframe src="https://www.openstreetmap.org/export/embed.html?bbox=77.48%2C12.80%2C77.82%2C13.12&layer=mapnik" loading="lazy"></iframe></div><div class="section">Mapped Locations</div><div class="grid cards3">${locs.map(locCard).join("")}</div></div>${footer()}`;
+function renderMap() {
+  const mapData = (window.DATA && window.DATA.locations) ? window.DATA.locations : [];
+  const C = {
+    "Premium": "#C9A96E",
+    "High Growth": "#3ECFB2",
+    "High Potential": "#6E9EFF",
+    "Stable": "#A0AEC0",
+    "Budget": "#F6A35A"
+  };
+
+  main.innerHTML = `
+    <div class="page-head">
+      <div>
+        <h1>Geospatial Intelligence Map</h1>
+        <p>Click any marker for detailed ROI analysis and investment insights.</p>
+      </div>
+      <select id="mapFilter" class="select">
+        <option>All</option>
+        <option>Top Premium</option>
+        <option>Top Affordable</option>
+        <option>High Growth</option>
+      </select>
+    </div>
+
+    <div class="card map-card">
+      <div id="mapCanvas" class="map-canvas"></div>
+      <div class="map-legend">
+        ${Object.entries(C).map(([k,v]) =>
+          `<span><i style="background:${v}"></i>${k}</span>`).join("")}
+      </div>
+    </div>
+
+    <div class="section-title">Mapped Locations</div>
+    <div id="mapCards" class="grid grid-3"></div>
+  `;
+
+  const map = L.map("mapCanvas", {
+    zoomControl: true,
+    scrollWheelZoom: true
+  }).setView([12.9716, 77.5946], 11);
+
+  L.tileLayer(
+    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    }
+  ).addTo(map);
+
+  let markers = [];
+
+  function popupHTML(x, color) {
+    const money = n => Number(n || 0).toLocaleString("en-IN", {
+      maximumFractionDigits: 0
+    });
+
+    return `
+      <div style="min-width:260px;font-family:Arial,sans-serif">
+        <h3 style="margin:0 0 8px;color:${color}">${x.location}</h3>
+        <div style="font-size:12px;color:#9aa6bd;margin-bottom:10px">${x.zone || ""}</div>
+        <div><b>Category:</b> ${x.cat}</div>
+        <div><b>Price/sqft:</b> ₹${money(x.pps)}</div>
+        <div><b>Investment Score:</b> ${Number(x.score || 0).toFixed(0)}/100</div>
+        <div><b>5-Year ROI:</b> ${Number(x.roi5 || 0).toFixed(1)}%</div>
+        <hr style="border:0;border-top:1px solid #33405a;margin:10px 0">
+        <div><b>Forecast 1Y:</b> ₹${money(x.p1)}</div>
+        <div><b>Forecast 3Y:</b> ₹${money(x.p3)}</div>
+        <div><b>Forecast 5Y:</b> ₹${money(x.p5)}</div>
+        ${x.insight ? `<p style="margin:10px 0 0;color:#aeb9cf">${x.insight}</p>` : ""}
+      </div>
+    `;
+  }
+
+  function getFiltered(filter) {
+    let rows = [...mapData];
+
+    if (filter === "Top Premium") {
+      rows = rows.filter(x => x.cat === "Premium")
+                   .sort((a,b) => b.score - a.score)
+                   .slice(0, 15);
+    } else if (filter === "Top Affordable") {
+      rows = rows.sort((a,b) => a.pps - b.pps).slice(0, 15);
+    } else if (filter === "High Growth") {
+      rows = rows.filter(x => x.cat === "High Growth" || x.cat === "High Potential")
+                   .sort((a,b) => b.growth - a.growth)
+                   .slice(0, 20);
+    }
+
+    return rows.filter(x =>
+      Number.isFinite(Number(x.lat)) &&
+      Number.isFinite(Number(x.lon))
+    );
+  }
+
+  function draw(filter = "All") {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    const rows = getFiltered(filter);
+    const bounds = [];
+
+    rows.forEach(x => {
+      const color = C[x.cat] || "#A0AEC0";
+      const marker = L.circleMarker([Number(x.lat), Number(x.lon)], {
+        radius: 7 + Math.min(8, Math.max(0, Number(x.score || 0) / 12)),
+        color,
+        fillColor: color,
+        fillOpacity: 0.88,
+        weight: 2
+      });
+
+      marker.bindPopup(popupHTML(x, color));
+      marker.bindTooltip(
+        `<b>${x.location}</b><br>${x.cat} · Score ${Number(x.score || 0).toFixed(0)}`,
+        {direction: "top", opacity: 0.95}
+      );
+
+      marker.addTo(map);
+      markers.push(marker);
+      bounds.push([Number(x.lat), Number(x.lon)]);
+    });
+
+    if (bounds.length === 1) {
+      map.setView(bounds[0], 13);
+    } else if (bounds.length > 1) {
+      map.fitBounds(bounds, {padding: [35, 35], maxZoom: 13});
+    } else {
+      map.setView([12.9716, 77.5946], 11);
+    }
+
+    const cards = document.getElementById("mapCards");
+    cards.innerHTML = rows.map(x => {
+      const color = C[x.cat] || "#A0AEC0";
+      return `
+        <div class="card location-card" onclick="window.__openLocation('${String(x.location).replace(/'/g, "\\'")}')">
+          <div class="badge" style="border-color:${color};color:${color}">${x.cat}</div>
+          <h3>${x.location}</h3>
+          <p>${x.zone || "Bangalore"} · ₹${Number(x.pps || 0).toLocaleString("en-IN")}/sqft</p>
+          <div class="mini-stats">
+            <span>Score <b>${Number(x.score || 0).toFixed(0)}</b></span>
+            <span>Growth <b>${Number(x.growth || 0).toFixed(1)}%</b></span>
+            <span>ROI 5Y <b>${Number(x.roi5 || 0).toFixed(1)}%</b></span>
+          </div>
+        </div>
+      `;
+    }).join("") || `<div class="empty">No locations match this filter.</div>`;
+  }
+
+  window.__openLocation = function(name) {
+    const idx = mapData.findIndex(x => x.location === name);
+    if (idx < 0) return;
+    const x = mapData[idx];
+    const color = C[x.cat] || "#A0AEC0";
+    map.setView([Number(x.lat), Number(x.lon)], 14);
+    const marker = markers.find(m => {
+      const p = m.getLatLng();
+      return Math.abs(p.lat - Number(x.lat)) < 0.00001 &&
+             Math.abs(p.lng - Number(x.lon)) < 0.00001;
+    });
+    if (marker) marker.openPopup();
+  };
+
+  document.getElementById("mapFilter").addEventListener("change", e => {
+    draw(e.target.value);
+  });
+
+  setTimeout(() => map.invalidateSize(), 100);
+  draw("All");
 }
+
 function render(page){({overview:renderOverview,map:renderMap,roi:renderROI,ranking:renderRanking,city:renderCity,insights:renderInsights,agents:renderAgents,data:renderData}[page]||renderOverview)()}
 document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));b.classList.add("active");render(b.dataset.page)});
 async function start(){
