@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AREIS — Autonomous Real Estate Interactive System</title>
+  <meta name="description" content="Bangalore real estate market intelligence dashboard — 2021–2025">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><span class="logo">AREIS</span><span class="tagline">Autonomous Real Estate Interactive System</span></div>
+      <div class="badge">Bangalore · 2021–2025</div>
+    </header>
+
+    <aside class="sidebar">
+      <div class="side-title">INTELLIGENCE</div>
+      <button class="nav active" data-page="overview">⌂ <span>Overview</span></button>
+      <button class="nav" data-page="map">⌖ <span>Interactive Map</span></button>
+      <button class="nav" data-page="roi">↗ <span>ROI Analysis</span></button>
+      <button class="nav" data-page="ranking">★ <span>Investment Ranking</span></button>
+      <button class="nav" data-page="city">◈ <span>City Deep Dive</span></button>
+      <button class="nav" data-page="insights">✦ <span>Market Insights</span></button>
+      <button class="nav" data-page="agents">◎ <span>AI Agents</span></button>
+      <button class="nav" data-page="data">▦ <span>Data Explorer</span></button>
+      <div class="side-bottom">
+        <div class="status-dot"></div>
+        <div><b>Browser deployment</b><small>GitHub Pages · Static</small></div>
+      </div>
+    </aside>
+
+    <main id="main"></main>
+  </div>
+
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <div>Loading Bangalore market data…</div>
+    <small id="load-status">Connecting to GitHub data source</small>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
